@@ -1,5 +1,5 @@
 import numpy as np
-from src.utils.cross_correlation import correlate2D
+from src.utils.convolution_utils import correlate2D, convolve2D
 
 
 class Convolution:
@@ -34,10 +34,52 @@ class Convolution:
         :return: 3D numpy array with shape (depth, output_height, output_width)
                  representing the output of the convolutional layer.
         """
+
+        # Store the input array for use in backpropagation
         self.input = input_array
+
+        # Initialize the output by copying the biases (one per output channel)
         self.output = np.copy(self.biases)
+
+        # Iterate over each output channel
         for i in range(self.depth):
+
+            # Iterate over each input channel
             for j in range(self.input_depth):
+
+                # Perform 2D correlation between the input and the current kernel
+                # Add the result to the output array
                 self.output += correlate2D(self.input[j], self.kernels[i, j])
         return self.output
-        
+
+    def backward(self, output_gradient, learning_rate):
+        """
+        Perform the backpropagation step to compute gradients and update the kernels and biases.
+
+        :param output_gradient: Gradient of the loss with respect to the output of this layer
+        :param learning_rate: The learning rate used to update the kernels and biases
+        :return: Gradient of the loss with respect to the input of this layer
+        """
+
+        # Initialize gradients for kernels and inputs
+        kernels_gradient = np.zeros(self.kernels_shape)
+        input_gradient = np.zeros(self.input_shape)
+
+        # Loop over each kernel and input channel
+        for i in range(self.depth):  # Iterate over each output channel
+            for j in range(self.input_depth):  # Iterate over each input channel
+
+                # Compute the gradient with respect to the kernel
+                kernels_gradient[i, j] = correlate2D(self.input[j], output_gradient[i])
+
+                # Compute the gradient with respect to the input
+                input_gradient[j] += convolve2D(output_gradient[i], self.kernels[i, j], "full")
+
+        # Update the kernels using the computed gradients
+        self.kernels -= learning_rate * kernels_gradient
+
+        # Update the biases using the output gradient
+        self.biases -= learning_rate * output_gradient
+
+        # Return the gradient with respect to the input
+        return input_gradient
