@@ -1,17 +1,23 @@
 import numpy as np
 from src.utils.convolution_utils import correlate2D, convolve2D
+from layer import Layer
 
 
-class Convolution:
+class Convolution(Layer):
     def __init__(self, input_shape, kernel_size, depth):
         """
-        Initialise the convolutional layer
+        Initialize the convolutional layer.
 
-        :param input_shape: tuple containing depth x height x width of input
-        :param kernel_size: int representing height x width of kernel
-        :param depth: int representing how many kernels we want
+        :param input_shape: tuple of (depth, height, width)
+            The shape of the input data where depth is the number of input channels,
+            height is the height of the input, and width is the width of the input.
+        :param kernel_size: int
+            The size (height and width) of the convolutional kernels. Assumes square kernels.
+        :param depth: int
+            The number of filters (kernels) in the convolutional layer. This determines the number of output channels.
         """
 
+        super().__init__()
         input_depth, input_height, input_width = input_shape
         self.depth = depth
         self.input_shape = input_shape
@@ -27,12 +33,12 @@ class Convolution:
 
     def forward(self, input_array):
         """
-        Perform the forward pass of the convolutional layer.
+        Perform the forward pass through the convolutional layer.
 
-        :param input_array: 3D numpy array with shape (input_depth, input_height, input_width)
-                            representing the input to the convolutional layer.
-        :return: 3D numpy array with shape (depth, output_height, output_width)
-                 representing the output of the convolutional layer.
+        :param input_array: numpy array
+            A 3D array of shape (input_depth, input_height, input_width) representing the input data.
+        :return: numpy array
+            A 3D array of shape (depth, output_height, output_width) representing the output of the convolutional layer.
         """
 
         # Store the input array for use in backpropagation
@@ -54,11 +60,16 @@ class Convolution:
 
     def backward(self, output_gradient, learning_rate):
         """
-        Perform the backpropagation step to compute gradients and update the kernels and biases.
+        Compute gradients for backpropagation and update the kernels and biases.
 
-        :param output_gradient: Gradient of the loss with respect to the output of this layer
-        :param learning_rate: The learning rate used to update the kernels and biases
-        :return: Gradient of the loss with respect to the input of this layer
+        :param output_gradient: numpy array
+            The gradient of the loss with respect to the output of this layer, of shape (depth, output_height,
+            output_width).
+        :param learning_rate: float
+            The learning rate used to scale the updates for kernels and biases.
+        :return: numpy array
+            The gradient of the loss with respect to the input of this layer, of shape (input_depth, input_height,
+            input_width).
         """
 
         # Initialize gradients for kernels and inputs
