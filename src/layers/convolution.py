@@ -1,6 +1,6 @@
 import numpy as np
 from src.utils.convolution_utils import correlate2D, convolve2D
-from layer import Layer
+from src.layers.layer import Layer
 
 
 class Convolution(Layer):
@@ -29,7 +29,7 @@ class Convolution(Layer):
 
         # initialise kernels and biases randomly
         self.kernels = np.random.randn(*self.kernels_shape)
-        self.biases = np.random.randn(*self.kernels_shape)
+        self.biases = np.random.randn(*self.output_shape)
 
     def forward(self, input_array):
         """
@@ -55,7 +55,7 @@ class Convolution(Layer):
 
                 # Perform 2D correlation between the input and the current kernel
                 # Add the result to the output array
-                self.output += correlate2D(self.input[j], self.kernels[i, j])
+                self.output[i] += correlate2D(self.input[j], self.kernels[i, j])
         return self.output
 
     def backward(self, output_gradient, learning_rate):
