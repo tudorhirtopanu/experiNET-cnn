@@ -1,4 +1,4 @@
-from layer import Layer
+from src.layers.layer import Layer
 import numpy as np
 
 
@@ -16,7 +16,7 @@ class Dense(Layer):
         initialized randomly. These parameters are adjusted during training.
         """
         super().__init__()
-        self.weights = np.random.randn(input_size, output_size)
+        self.weights = np.random.randn(output_size, input_size)
         self.bias = np.random.randn(output_size, 1)
 
     def forward(self, input_data):
