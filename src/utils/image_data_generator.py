@@ -139,6 +139,9 @@ class ImageDataGenerator:
         if self.image_mode == 'L':
             image = np.expand_dims(image, axis=-1)
 
+        # Rearrange the axes to have the depth/channels first: (channels, height, width)
+        image = np.transpose(image, (2, 0, 1))
+
         return image
 
     def __iter__(self):
