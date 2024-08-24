@@ -1,3 +1,4 @@
+from src.utils.training_visualiser import TrainingVisualiser
 
 
 class Model:
@@ -11,6 +12,7 @@ class Model:
         self.layers = []
         self.loss_function = loss_function
         self.loss_function_prime = loss_function_prime
+        self.visualiser = TrainingVisualiser()
 
     def add(self, layer):
         """
@@ -71,7 +73,12 @@ class Model:
                 num_samples += len(batch_images)
                 batch_average_error = batch_error / len(batch_images)
 
+                # Record batch error
+                self.visualiser.record_batch_error(batch_average_error)
+
                 print(f'\rEpoch {e + 1}/{epochs}, Batch {batch_number}/{total_batches}, Batch Error={batch_average_error:.6f}', end='')
 
             average_error = total_error / num_samples
+            self.visualiser.record_epoch_error(average_error)
             print(f'\rEpoch {e + 1}/{epochs}, Batch {batch_number}/{total_batches}, Average Error={average_error:.6f}')
+        self.visualiser.plot_errors()
