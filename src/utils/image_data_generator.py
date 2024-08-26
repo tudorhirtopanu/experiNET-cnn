@@ -15,12 +15,14 @@ class ImageDataGenerator:
     """
 
     # TODO: Allow users to specify whether augmentation or rescaling should occur during training or inference
-    def __init__(self, directory, batch_size=32, target_size=(150, 150), image_mode='RGB', shuffle=True, rescale=None, augmentation=None):
+    def __init__(self, train_directory, val_directory=None, batch_size=32, target_size=(150, 150), image_mode='RGB', shuffle=True, rescale=None, augmentation=None):
         """
         Custom image data generator.
 
-        :param directory: string
-            Path to the dataset directory.
+        :param train_directory: string
+            Path to the train dataset directory.
+        :param val_directory: string
+            Path to the validation dataset directory.
         :param batch_size: int
             Number of images per batch.
         :param target_size: tuple
@@ -34,7 +36,8 @@ class ImageDataGenerator:
         :param augmentation: function
             Applies augmentation to images.
         """
-        self.directory = directory
+        self.train_directory = train_directory
+        self.val_directory = val_directory
         self.batch_size = batch_size
         self.target_size = target_size
         self.image_mode = image_mode
@@ -42,23 +45,36 @@ class ImageDataGenerator:
         self.rescale = rescale
         self.augmentation = augmentation
 
-        if not os.path.isdir(self.directory):
-            raise ValueError(f"Directory {self.directory} does not exist.")
+        if not os.path.isdir(self.train_directory):
+            raise ValueError(f"Directory {self.train_directory} does not exist.")
 
         # Collect all image paths and labels
-        self.image_paths, self.labels = self._collect_image_paths_and_labels()
+        self.train_image_paths, self.train_labels = self._collect_image_paths_and_labels(self.train_directory)
 
         # Number of images
-        self.num_images = len(self.image_paths)
+        self.num_train_images = len(self.train_image_paths)
 
-        if self.num_images == 0:
+        # Load validation data if provided
+        if self.val_directory:
+            if not os.path.isdir(self.val_directory):
+                raise ValueError(f"Directory {self.val_directory} does not exist.")
+            self.val_image_paths, self.val_labels = self._collect_image_paths_and_labels(self.val_directory)
+            self.num_val_images = len(self.val_image_paths)
+        else:
+            self.val_image_paths, self.val_labels = None, None
+            self.num_val_images = 0
+
+        if self.num_train_images == 0:
             raise ValueError("No images found in the directory.")
+
+        if self.val_directory and self.num_val_images == 0:
+            raise ValueError("No images found in the validation directory.")
 
         # Shuffle the data initially
         if self.shuffle:
             self._shuffle_data()
 
-    def _collect_image_paths_and_labels(self):
+    def _collect_image_paths_and_labels(self, directory):
         """
         Collect image file paths and corresponding labels from the directory.
         Assumes that subdirectories represent classes.
@@ -72,7 +88,7 @@ class ImageDataGenerator:
         labels = []
 
         # Only consider subdirectories as class names
-        class_names = [d for d in os.listdir(self.directory) if os.path.isdir(os.path.join(self.directory, d))]
+        class_names = [d for d in os.listdir(directory) if os.path.isdir(os.path.join(directory, d))]
 
         # Handle case with exactly two classes
         if len(class_names) == 2:
@@ -88,7 +104,7 @@ class ImageDataGenerator:
                 label_map = {class_names[0]: 0, class_names[1]: 1}
 
             for class_name in class_names:
-                class_dir = os.path.join(self.directory, class_name)
+                class_dir = os.path.join(directory, class_name)
                 if os.path.isdir(class_dir):
                     label = label_map[class_name.lower()]
                     for filename in os.listdir(class_dir):
@@ -101,7 +117,7 @@ class ImageDataGenerator:
         else:
             self.class_indices = {class_name: idx for idx, class_name in enumerate(class_names)}
             for class_name in class_names:
-                class_dir = os.path.join(self.directory, class_name)
+                class_dir = os.path.join(directory, class_name)
                 if os.path.isdir(class_dir):
                     for filename in os.listdir(class_dir):
                         if filename.endswith(('.png', '.jpg', '.jpeg')):
@@ -114,9 +130,9 @@ class ImageDataGenerator:
         """
         Shuffle the image paths and corresponding labels to randomize the order of the data.
         """
-        combined = list(zip(self.image_paths, self.labels))
+        combined = list(zip(self.train_image_paths, self.train_labels))
         random.shuffle(combined)
-        self.image_paths, self.labels = zip(*combined)
+        self.train_image_paths, self.train_labels = zip(*combined)
 
     def _load_image(self, image_path):
         """
@@ -144,7 +160,7 @@ class ImageDataGenerator:
 
         return image
 
-    def __iter__(self):
+    def __iter__(self, mode='train'):
         """
         Iterator method to make the class iterable.
 
@@ -152,7 +168,8 @@ class ImageDataGenerator:
             Returns the iterator object itself.
         """
         self.index = 0
-        if self.shuffle:
+        self.mode = mode
+        if self.shuffle and self.mode == 'train':
             self._shuffle_data()
         return self
 
@@ -168,14 +185,20 @@ class ImageDataGenerator:
 
         :raises StopIteration: If there are no more batches to fetch.
         """
-        if self.index >= self.num_images:
+
+        if self.mode == 'train':
+            image_paths, labels, num_images = self.train_image_paths, self.train_labels, self.num_train_images
+        else:
+            image_paths, labels, num_images = self.val_image_paths, self.val_labels, self.num_val_images
+
+        if self.index >= self.num_train_images:
             raise StopIteration
 
-        end_index = min(self.index + self.batch_size, self.num_images)
+        end_index = min(self.index + self.batch_size, num_images)
 
         # Get the batch data
-        batch_image_paths = self.image_paths[self.index:end_index]
-        batch_labels = self.labels[self.index:end_index]
+        batch_image_paths = image_paths[self.index:end_index]
+        batch_labels = labels[self.index:end_index]
 
         batch_images = [self._load_image(image_path) for image_path in batch_image_paths]
 
@@ -184,7 +207,7 @@ class ImageDataGenerator:
         batch_labels = np.array(batch_labels)
 
         # Apply augmentation if available
-        if self.augmentation:
+        if self.mode == 'train' and self.augmentation:
             batch_images = np.array([self.augmentation(image) for image in batch_images])
 
         self.index += self.batch_size
@@ -197,4 +220,5 @@ class ImageDataGenerator:
         :return: int
             Total number of batches.
         """
-        return int(np.ceil(self.num_images / float(self.batch_size)))
+        return int(np.ceil(self.num_train_images / float(self.batch_size)))
+
