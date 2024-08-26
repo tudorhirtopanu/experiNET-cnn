@@ -43,42 +43,71 @@ class Model:
         for layer in reversed(self.layers):
             grad = layer.backward(grad, learning_rate)
 
-    def train(self, train_gen, epochs, learning_rate):
+    def train(self, data_gen, epochs, learning_rate):
         """
         Train the model using the provided data.
 
-        :param train_gen: An iterable that provides batches of training data.
+        :param data_gen: ImageDataGenerator instance with training and validation(optional) data.
         :param epochs: Number of training epochs.
         :param learning_rate: Learning rate for updating the layers' parameters.
         """
 
+        has_validation_data = data_gen.val_directory is not None and data_gen.num_val_images > 0
+
         for e in range(epochs):
 
-            total_error = 0
-            num_samples = 0
-            batch_number = 0
-            total_batches = len(train_gen)
+            total_error = 0  # Accumulated error over the epoch
+            num_samples = 0  # Total number of samples in the epoch
+            batch_number = 0  # Current batch being iterated
+            total_batches = len(data_gen)  # Total number of batches in the data generator
 
-            for batch_images, batch_labels in train_gen:
-                batch_number += 1
-                batch_error = 0
+            for batch_images, batch_labels in data_gen.__iter__(mode='train'):
+                batch_number += 1  # Increase batch number
+                batch_error = 0  # Accumulated error for the current batch
 
                 for image, label in zip(batch_images, batch_labels):
-                    output = self.forward(image)
-                    batch_error += self.loss_function(label, output)
-                    grad = self.loss_function_prime(label, output)
-                    self.backward(grad, learning_rate)
 
-                total_error += batch_error
-                num_samples += len(batch_images)
-                batch_average_error = batch_error / len(batch_images)
+                    output = self.forward(image)  # Forward pass through the model
+                    batch_error += self.loss_function(label, output)  # Calculate loss for the current image
+                    grad = self.loss_function_prime(label, output)  # Compute gradient of loss with respect to output
+                    self.backward(grad, learning_rate)  # Backward pass and parameter update
 
-                # Record batch error
-                self.visualiser.record_batch_error(batch_average_error)
+                total_error += batch_error  # Update total error across all batches
+                num_samples += len(batch_images)  # Update the total number of samples
+                batch_average_error = batch_error / len(batch_images)  # Compute average error for the current batch
 
+                # Print progress for the current batch
                 print(f'\rEpoch {e + 1}/{epochs}, Batch {batch_number}/{total_batches}, Batch Error={batch_average_error:.6f}', end='')
 
+            # Calculate and print average error for the epoch
             average_error = total_error / num_samples
-            self.visualiser.record_epoch_error(average_error)
-            print(f'\rEpoch {e + 1}/{epochs}, Batch {batch_number}/{total_batches}, Average Error={average_error:.6f}')
+            print(f'\rEpoch {e + 1}/{epochs}, Batch {batch_number}/{total_batches}, Average Error={average_error:.6f}', end='')
+
+            # Validation loop
+            if has_validation_data:
+                val_average_error = self.validate(data_gen)
+                self.visualiser.record_epoch_error(average_error, val_average_error)
+                print(f', Validation Error={val_average_error:.6f}')
+            else:
+                self.visualiser.record_epoch_error(average_error)
+                print()
+
         self.visualiser.plot_errors()
+
+    def validate(self, data_gen):
+        """
+        Perform validation on the validation data.
+
+        :param data_gen: ImageDataGenerator instance with validation data.
+        :return: Average validation error.
+        """
+        val_total_error = 0  # Accumulated validation error
+        val_num_samples = 0  # Total number of validation samples
+
+        for val_batch_images, val_batch_labels in data_gen.__iter__(mode='val'):
+            for image, label in zip(val_batch_images, val_batch_labels):
+                output = self.forward(image)  # Forward pass through the model
+                val_total_error += self.loss_function(label, output)  # Calculate validation loss
+                val_num_samples += 1  # Update the count of validation samples
+
+        return val_total_error / val_num_samples  # Return average validation error
