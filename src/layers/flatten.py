@@ -1,11 +1,11 @@
 import numpy as np
-from layer import Layer
+from src.layers.layer import Layer
 
 
-class Reshape(Layer):
+class Flatten(Layer):
     def __init__(self, input_shape, output_shape):
         """
-        Initialize a Reshape layer.
+        Initialize a Flatten layer.
 
         :param input_shape: tuple
             The shape of the input data that this layer will reshape.
@@ -18,16 +18,21 @@ class Reshape(Layer):
         self.input_shape = input_shape
         self.output_shape = output_shape
 
-    def forward(self, input):
+    def forward(self, input_data):
         """
         Perform the forward pass by reshaping the input data.
 
-        :param input: numpy array
+        :param input_data: numpy array
             The input data to be reshaped. Its shape must match self.input_shape.
         :return: numpy array
             The reshaped output data with shape self.output_shape.
         """
-        return np.reshape(input, self.output_shape)
+        self.input = input_data
+        batch_size = input_data.shape[0]
+
+        # Flatten to (batch_size, flattened_size)
+        reshaped_data = np.reshape(input_data, (batch_size, *self.output_shape))
+        return reshaped_data
 
     def backward(self, output_gradient, learning_rate):
         """
@@ -41,4 +46,6 @@ class Reshape(Layer):
         :return: numpy.ndarray
             The gradient of the loss with respect to the input of this layer, reshaped to self.input_shape.
         """
-        return np.reshape(output_gradient, self.input_shape)
+        batch_size = output_gradient.shape[0]
+        reshaped_gradient = np.reshape(output_gradient, (batch_size, *self.input_shape))
+        return reshaped_gradient
