@@ -16,20 +16,25 @@ class Dense(Layer):
         initialized randomly. These parameters are adjusted during training.
         """
         super().__init__()
-        self.weights = np.random.randn(output_size, input_size)
-        self.bias = np.random.randn(output_size, 1)
+
+        self.weights = np.random.randn(output_size, input_size) * np.sqrt(2 / input_size)
+        self.bias = np.zeros(output_size)
 
     def forward(self, input_data):
         """
         Computes the forward pass for the dense layer.
 
         :param input_data: numpy array
-            Input data to the layer (shape: input_size x batch_size).
+            Input data to the layer (shape: batch_size x input_size).
         :return: numpy array
-            Output of the layer (shape: output_size x batch_size).
+            Output of the layer (shape: batch_size x output_size).
         """
         self.input = input_data
-        return np.dot(self.weights, self.input) + self.bias
+
+        # Perform matrix multiplication and add bias
+        output = np.dot(self.input, self.weights.T) + self.bias
+
+        return output
 
     def backward(self, output_gradient, learning_rate):
         """
@@ -43,7 +48,14 @@ class Dense(Layer):
             Gradient of the loss with respect to the layer's input,
             to be propagated to the previous layer.
         """
-        weights_gradient = np.dot(output_gradient, self.input.T)
+        batch_size = self.input.shape[0]
+
+        # Compute gradients for weights and input
+        weights_gradient = np.dot(output_gradient.T, self.input) / batch_size
+        input_gradient = np.dot(output_gradient, self.weights)
+
+        # Update weights and biases
         self.weights -= learning_rate * weights_gradient
-        self.bias -= learning_rate * output_gradient
-        return np.dot(self.weights.T, output_gradient)
+        self.bias -= learning_rate * np.sum(output_gradient, axis=0) / batch_size
+
+        return input_gradient
