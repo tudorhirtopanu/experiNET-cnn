@@ -78,29 +78,58 @@ class ImageDataGenerator:
             self._shuffle_data()
 
     def _collect_image_paths_and_labels(self, directory):
+        """
+        Collects image file paths and corresponding labels from a specified directory.
+
+        This method scans through a directory that contains subdirectories representing different classes.
+        It collects all image file paths and assigns labels based on the directory structure.
+        The labels are binary if there are exactly two subdirectories named 'positive' and 'negative'.
+        Otherwise, labels are one-hot encoded for multi-class classification.
+
+        :param directory: str
+            Path to the directory containing subdirectories for each class of images.
+        :return: tuple (image_paths, labels)
+            List of paths to each image file and a list of labels corresponding to each image, encoded as either binary
+            or one-hot vectors.
+        """
         image_paths = []
         labels = []
 
         # Only consider subdirectories as class names
         class_names = sorted([d for d in os.listdir(directory) if os.path.isdir(os.path.join(directory, d))])
+
+        # Create a mapping from class names to indices (used for one-hot encoding)
         self.class_indices = {class_name: idx for idx, class_name in enumerate(class_names)}
         self.index_to_class = {idx: class_name for class_name, idx in self.class_indices.items()}
+
+        # Number of classes determined by the number of subdirectories
         num_classes = len(class_names)
 
+        # Determine if binary classification should be used based on class names
+        if num_classes == 2 and set(class_names) == {'positive', 'negative'}:
+            is_binary_classification = True
+        else:
+            is_binary_classification = False
+
+        # Iterate through each class directory and collect image paths and labels
         for class_name in class_names:
+
+            # Path to the current class directory
             class_dir = os.path.join(directory, class_name)
+
             for filename in os.listdir(class_dir):
+
+                # Check if the file is an image with a supported extension
                 if filename.lower().endswith(('.png', '.jpg', '.jpeg')):
                     image_paths.append(os.path.join(class_dir, filename))
 
-                    # Condition to one-hot encode based on number of classes
-                    if num_classes > 2:
-                        # One-hot encode the label for multi-class
+                    if is_binary_classification:
+                        # Binary classification (use 0 for 'negative' and 1 for 'positive')
+                        label = np.array([1 if class_name == 'positive' else 0])
+                    else:
+                        # Multi-class classification (including two-class cases not named 'positive' and 'negative')
                         label = np.zeros(num_classes)
                         label[self.class_indices[class_name]] = 1
-                    else:
-                        # Binary classification (use 0 or 1)
-                        label = np.array([self.class_indices[class_name]])
 
                     labels.append(label)
 
@@ -171,27 +200,31 @@ class ImageDataGenerator:
         else:
             image_paths, labels, num_images = self.val_image_paths, self.val_labels, self.num_val_images
 
+        # If the current index exceeds the number of images, reset and stop iteration
         if self.index >= self.num_train_images:
             self.index = 0
             raise StopIteration
 
+        # Calculate the end index for the current batch
         end_index = min(self.index + self.batch_size, num_images)
 
         # Get the batch data
         batch_image_paths = image_paths[self.index:end_index]
         batch_labels = labels[self.index:end_index]
 
-        batch_images = [self._load_image(image_path) for image_path in batch_image_paths]
+        batch_images = []
+        for image_path in batch_image_paths:
+            image = self._load_image(image_path)
+            if self.mode == 'train' and self.augmentation:
+                image = self.augmentation(image)
+            batch_images.append(image)
 
         # Convert lists to numpy arrays
         batch_images = np.array(batch_images)
         batch_labels = np.array(batch_labels)
 
-        # Apply augmentation if available
-        if self.mode == 'train' and self.augmentation:
-            batch_images = np.array([self.augmentation(image) for image in batch_images])
-
         self.index += self.batch_size
+
         return batch_images, batch_labels
 
     def __len__(self):
@@ -201,7 +234,6 @@ class ImageDataGenerator:
         :return: int
             Total number of batches.
         """
-        #TODO: Make it context aware for when to use train or val
         if self.mode == 'train':
             return int(np.ceil(self.num_train_images / float(self.batch_size)))
         elif self.mode == 'val':
