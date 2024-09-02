@@ -14,7 +14,6 @@ class ImageDataGenerator:
     options for shuffling, rescaling, and image augmentation.
     """
 
-    # TODO: Allow users to specify whether augmentation or rescaling should occur during training or inference
     def __init__(self, train_directory, val_directory=None, batch_size=32, target_size=(150, 150), image_mode='RGB', shuffle=True, rescale=None, augmentation=None):
         """
         Custom image data generator.
@@ -44,6 +43,7 @@ class ImageDataGenerator:
         self.shuffle = shuffle
         self.rescale = rescale
         self.augmentation = augmentation
+        self.mode = 'train'
 
         if not os.path.isdir(self.train_directory):
             raise ValueError(f"Directory {self.train_directory} does not exist.")
@@ -56,10 +56,13 @@ class ImageDataGenerator:
 
         # Load validation data if provided
         if self.val_directory:
+
             if not os.path.isdir(self.val_directory):
                 raise ValueError(f"Directory {self.val_directory} does not exist.")
+
             self.val_image_paths, self.val_labels = self._collect_image_paths_and_labels(self.val_directory)
             self.num_val_images = len(self.val_image_paths)
+
         else:
             self.val_image_paths, self.val_labels = None, None
             self.num_val_images = 0
@@ -75,54 +78,31 @@ class ImageDataGenerator:
             self._shuffle_data()
 
     def _collect_image_paths_and_labels(self, directory):
-        """
-        Collect image file paths and corresponding labels from the directory.
-        Assumes that subdirectories represent classes.
-
-        :return image_paths: list
-            Image file paths.
-        :return labels: list
-            Labels corresponding to image paths.
-        """
         image_paths = []
         labels = []
 
         # Only consider subdirectories as class names
-        class_names = [d for d in os.listdir(directory) if os.path.isdir(os.path.join(directory, d))]
+        class_names = sorted([d for d in os.listdir(directory) if os.path.isdir(os.path.join(directory, d))])
+        self.class_indices = {class_name: idx for idx, class_name in enumerate(class_names)}
+        self.index_to_class = {idx: class_name for class_name, idx in self.class_indices.items()}
+        num_classes = len(class_names)
 
-        # Handle case with exactly two classes
-        if len(class_names) == 2:
-            positive_class = 'positive' in class_names
-            negative_class = 'negative' in class_names
+        for class_name in class_names:
+            class_dir = os.path.join(directory, class_name)
+            for filename in os.listdir(class_dir):
+                if filename.lower().endswith(('.png', '.jpg', '.jpeg')):
+                    image_paths.append(os.path.join(class_dir, filename))
 
-            # Assign labels based on 'positive' and 'negative' names, or randomly otherwise
-            if positive_class and negative_class:
-                # Assign labels based on class names
-                label_map = {'positive': 1, 'negative': 0}
-            else:
-                random.shuffle(class_names)
-                label_map = {class_names[0]: 0, class_names[1]: 1}
+                    # Condition to one-hot encode based on number of classes
+                    if num_classes > 2:
+                        # One-hot encode the label for multi-class
+                        label = np.zeros(num_classes)
+                        label[self.class_indices[class_name]] = 1
+                    else:
+                        # Binary classification (use 0 or 1)
+                        label = np.array([self.class_indices[class_name]])
 
-            for class_name in class_names:
-                class_dir = os.path.join(directory, class_name)
-                if os.path.isdir(class_dir):
-                    label = label_map[class_name.lower()]
-                    for filename in os.listdir(class_dir):
-                        if filename.endswith(('.png', '.jpg', '.jpeg')):
-                            image_paths.append(os.path.join(class_dir, filename))
-                            labels.append(label)
-
-        # Handle the case with more than 2 classes
-        # TODO: add support for one hot encoding
-        else:
-            self.class_indices = {class_name: idx for idx, class_name in enumerate(class_names)}
-            for class_name in class_names:
-                class_dir = os.path.join(directory, class_name)
-                if os.path.isdir(class_dir):
-                    for filename in os.listdir(class_dir):
-                        if filename.endswith(('.png', '.jpg', '.jpeg')):
-                            image_paths.append(os.path.join(class_dir, filename))
-                            labels.append(self.class_indices[class_name])
+                    labels.append(label)
 
         return image_paths, labels
 
@@ -173,7 +153,7 @@ class ImageDataGenerator:
             self._shuffle_data()
         return self
 
-    # TODO: reset iterator at end of epoch & use lazy loading
+    # TODO: use lazy loading
     def __next__(self):
         """
         Fetch the next batch of images and labels.
@@ -192,6 +172,7 @@ class ImageDataGenerator:
             image_paths, labels, num_images = self.val_image_paths, self.val_labels, self.num_val_images
 
         if self.index >= self.num_train_images:
+            self.index = 0
             raise StopIteration
 
         end_index = min(self.index + self.batch_size, num_images)
@@ -220,5 +201,11 @@ class ImageDataGenerator:
         :return: int
             Total number of batches.
         """
-        return int(np.ceil(self.num_train_images / float(self.batch_size)))
+        #TODO: Make it context aware for when to use train or val
+        if self.mode == 'train':
+            return int(np.ceil(self.num_train_images / float(self.batch_size)))
+        elif self.mode == 'val':
+            return int(np.ceil(self.num_val_images / float(self.batch_size)))
+        else:
+            raise ValueError("Invalid mode. Use 'train' or 'val'.")
 
