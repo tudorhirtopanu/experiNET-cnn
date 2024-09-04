@@ -45,6 +45,10 @@ class ImageDataGenerator:
         self.augmentation = augmentation
         self.mode = 'train'
 
+        # Initialize class mapping attributes
+        self.class_indices = {}
+        self.index_to_class = {}
+
         if not os.path.isdir(self.train_directory):
             raise ValueError(f"Directory {self.train_directory} does not exist.")
 
@@ -124,10 +128,10 @@ class ImageDataGenerator:
                     image_paths.append(os.path.join(class_dir, filename))
 
                     if is_binary_classification:
-                        # Binary classification (use 0 for 'negative' and 1 for 'positive')
+                        # Binary classification
                         label = np.array([1 if class_name == 'positive' else 0])
                     else:
-                        # Multi-class classification (including two-class cases not named 'positive' and 'negative')
+                        # Multi-class classification
                         label = np.zeros(num_classes)
                         label[self.class_indices[class_name]] = 1
 
@@ -164,7 +168,7 @@ class ImageDataGenerator:
         if self.image_mode == 'L':
             image = np.expand_dims(image, axis=-1)
 
-        # Rearrange the axes to have the depth/channels first: (channels, height, width)
+        # Rearrange the axes to have the channels first: (channels, height, width)
         image = np.transpose(image, (2, 0, 1))
 
         return image
@@ -182,7 +186,6 @@ class ImageDataGenerator:
             self._shuffle_data()
         return self
 
-    # TODO: use lazy loading
     def __next__(self):
         """
         Fetch the next batch of images and labels.
@@ -212,17 +215,27 @@ class ImageDataGenerator:
         batch_image_paths = image_paths[self.index:end_index]
         batch_labels = labels[self.index:end_index]
 
+        # Initialize a list to hold the batch of images
         batch_images = []
+
+        # Loop through each image path in the current batch
         for image_path in batch_image_paths:
+
+            # Load the image from disk
             image = self._load_image(image_path)
+
+            # Apply augmentation to the image if in training mode and augmentation is provided
             if self.mode == 'train' and self.augmentation:
                 image = self.augmentation(image)
+
+            # Append the processed image to the batch list
             batch_images.append(image)
 
-        # Convert lists to numpy arrays
+        # Convert the list of images and labels to numpy arrays
         batch_images = np.array(batch_images)
         batch_labels = np.array(batch_labels)
 
+        # Increment the index by the batch size for the next iteration
         self.index += self.batch_size
 
         return batch_images, batch_labels
