@@ -17,6 +17,9 @@ class Dense(Layer):
         """
         super().__init__()
 
+        self.input_size = input_size
+        self.output_size = output_size
+
         self.weights = np.random.randn(output_size, input_size) * np.sqrt(2 / input_size)
         self.bias = np.zeros(output_size)
 
