@@ -25,14 +25,13 @@ class Convolution(Layer):
         self.output_shape = (depth, input_height - kernel_size+1, input_width - kernel_size+1)
 
         # Number of kernels, depth of each kernel, size of matrices in each kernel
-        self.kernels_shape = (depth, input_depth, kernel_size, kernel_size)
+        self.kernels_shape = (depth, self.input_depth, kernel_size, kernel_size)
 
         # Improved weight initialization using He initialization (recommended for ReLU)
-        self.kernels = np.random.randn(*self.kernels_shape) * np.sqrt(2 / (input_depth * kernel_size * kernel_size))
+        self.kernels = np.random.randn(*self.kernels_shape) * np.sqrt(2 / (self.input_depth * kernel_size * kernel_size))
 
         # Initialize biases to zero
         self.biases = np.zeros(depth)
-        print(self.biases.shape)
 
     def forward(self, input_array):
         """
