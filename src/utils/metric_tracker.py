@@ -60,8 +60,11 @@ class MetricTracker:
         # Plot training and validation loss
         plt.figure()
         plt.plot(epochs, self.train_losses, 'r', label='Training loss')
-        plt.plot(epochs, self.val_losses, 'b', label='Validation loss')
-        plt.title('Training and Validation Loss')
+        if self.val_losses:
+            plt.plot(epochs, self.val_losses, 'b', label='Validation loss')
+            plt.title('Training and Validation Loss')
+        else:
+            plt.title('Training Loss')
         plt.xlabel('Epochs')
         plt.ylabel('Loss')
         plt.legend()
@@ -70,8 +73,11 @@ class MetricTracker:
         # Plot training and validation accuracy
         plt.figure()
         plt.plot(epochs, self.train_accuracies, 'r', label='Training Accuracy')
-        plt.plot(epochs, self.val_accuracies, 'b', label='Validation Accuracy')
-        plt.title('Training and Validation Accuracy')
+        if self.val_accuracies:
+            plt.plot(epochs, self.val_accuracies, 'b', label='Validation Accuracy')
+            plt.title('Training and Validation Accuracy')
+        else:
+            plt.title('Training Accuracy')
         plt.xlabel('Epochs')
         plt.ylabel('Accuracy')
         plt.legend()
