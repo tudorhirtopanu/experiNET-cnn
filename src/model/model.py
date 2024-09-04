@@ -1,4 +1,15 @@
+import h5py
+import os
+import numpy as np
+
 from src.utils.metric_tracker import MetricTracker
+from src.layers.convolution import Convolution
+from src.layers.dense import Dense
+from src.layers.flatten import Flatten
+from src.activations.relu import ReLU
+from src.activations.softmax import Softmax
+from src.activations.sigmoid import Sigmoid
+from src.activations.tanh import Tanh
 
 
 class Model:
@@ -15,6 +26,54 @@ class Model:
         self.loss_function = loss_function
         self.loss_function_prime = loss_function_prime
         self.metric_tracker = MetricTracker()
+
+        # To be set during training with ImageDataGenerator
+        self.index_to_class = None
+        self.class_indices = None
+
+    def print_information(self):
+        """
+        Print detailed information about the model structure, including each layer's class name.
+
+        Note: This function will be updated to contain more information about the model structure.
+        """
+
+        # Print a header for the model structure information
+        print("Model Structure:")
+
+        # Loop through each layer in the model's list of layers
+        for layer in self.layers:
+            # Print the class name of each layer
+            print(layer.__class__.__name__)
+
+    def predict(self, x):
+        """
+        Perform a forward pass through the model to make a prediction and return both
+        the predicted class index and the corresponding class name.
+
+        :param x: numpy array
+            Input data representing an image
+        :return: tuple
+            The confidence score and the class name.
+
+        NOTE: This method currently only supports predictions for one image, as opposed to batches of images.
+        """
+        # Forward pass to get raw predictions
+        confidence_batch = self.forward(x)
+
+        confidence_arr = confidence_batch[0]
+
+        if len(confidence_arr) == 1:
+            confidence_score = confidence_arr
+            predicted_index = int(round(confidence_arr))
+        else:
+            predicted_index = np.argmax(confidence_arr, axis=-1)
+            confidence_score = confidence_arr[predicted_index]
+
+        # Retrieve the class name using index_to_class mapping
+        class_name = self.index_to_class[predicted_index] if self.index_to_class is not None else None
+
+        return confidence_score, class_name
 
     def add(self, layer):
         """
@@ -62,6 +121,8 @@ class Model:
             Learning rate for updating the layers' parameters.
         """
 
+        self.index_to_class = data_gen.index_to_class
+        self.class_indices = data_gen.class_indices
         has_validation_data = data_gen.val_directory is not None and data_gen.num_val_images > 0
 
         for e in range(epochs):
@@ -103,7 +164,7 @@ class Model:
             # Record the training metrics
             self.metric_tracker.record_train_metrics(average_error, average_accuracy)
 
-            print(f'\rEpoch {e + 1}/{epochs}, Batch {batch_number}/{total_batches} --- Avg Err={average_error:.6f}, Avg Accuracy={average_accuracy:.2%}', end='')
+            print(f'\rEpoch {e + 1}/{epochs}, Batch {batch_number}/{total_batches} --- Train Err={average_error:.6f}, Train Accuracy={average_accuracy:.2%}', end='')
 
             # Check if validation data is available
             if has_validation_data:
@@ -154,3 +215,84 @@ class Model:
         # Return average validation error and average validation accuracy
         return val_total_error / val_total_batches, val_total_accuracy / val_total_batches
 
+    def save(self, name):
+        """
+        :param name: str
+            The path where the model should be saved
+        """
+
+        # Get file path for saving the model
+        current_dir = os.path.dirname(__file__)
+        content_root_dir = os.path.abspath(os.path.join(current_dir, '..', '..'))
+        save_dir = os.path.join(content_root_dir, 'saved_models')
+        os.makedirs(save_dir, exist_ok=True)
+        file_path = os.path.join(save_dir, name)
+
+        # Open a file for writing in HDF5 format
+        with h5py.File(file_path, 'w') as f:
+
+            # Save the model architecture
+            architecture_group = f.create_group('architecture')
+
+            # Get names of loss function and its prime
+            architecture_group.attrs['loss_function'] = self.loss_function.__name__
+            architecture_group.attrs['loss_function_prime'] = self.loss_function_prime.__name__
+
+            # Convert dictionaries to lists of tuples and save as attributes
+            if self.class_indices is not None:
+                # Keys as strings (class names)
+                f.create_dataset('class_indices_keys', data=np.array(list(self.class_indices.keys()), dtype='S'))
+                # Values as integers (class indices)
+                f.create_dataset('class_indices_values', data=np.array(list(self.class_indices.values()), dtype=int))
+
+            if self.index_to_class is not None:
+                # Keys as integers (class indices)
+                f.create_dataset('index_to_class_keys', data=np.array(list(self.index_to_class.keys()), dtype=int))
+                # Values as strings (class names)
+                f.create_dataset('index_to_class_values', data=np.array(list(self.index_to_class.values()), dtype='S'))
+
+            # Save each layer's configuration and weights
+            for i, layer in enumerate(self.layers):
+
+                # Create a group for each layer
+                layer_group = architecture_group.create_group(f'layer_{i}')
+
+                # Set an attribute for the layer group
+                layer_group.attrs['class_name'] = layer.__class__.__name__
+
+                # Save parameters specific to Flatten layer
+                if isinstance(layer, Flatten):
+                    # Save input and output shapes as attributes for Flatten layer
+                    layer_group.attrs['input_shape'] = layer.input_shape
+                    layer_group.attrs['output_shape'] = layer.output_shape
+
+                # Save parameters for Dense layer
+                elif isinstance(layer, Dense):
+                    # Save input and output sizes for Dense layer
+                    layer_group.attrs['input_size'] = layer.input_size
+                    layer_group.attrs['output_size'] = layer.output_size
+
+                    # Save weights and biases
+                    layer_group.create_dataset('weights', data=layer.weights)
+                    layer_group.create_dataset('biases', data=layer.bias)
+
+                # Save parameters for Convolution layer
+                elif isinstance(layer, Convolution):
+
+                    # Save input shape
+                    layer_group.attrs['input_shape_conv'] = layer.input_shape
+
+                    # Save kernel size (assumed to be square) and depth
+                    layer_group.attrs['kernel_size'] = layer.kernels.shape[2]
+                    layer_group.attrs['depth'] = layer.depth
+
+                    # Save kernels and biases as datasets for convolutional layers
+                    layer_group.create_dataset('kernels', data=layer.kernels)
+                    layer_group.create_dataset('biases', data=layer.biases)
+
+                # Check for specific activation layers
+                if isinstance(layer, (ReLU, Sigmoid, Softmax, Tanh)):
+                    layer_group.attrs['activation_function'] = layer.activation.__name__
+                    layer_group.attrs['activation_function_prime'] = layer.activation_prime.__name__
+
+            print(f'Model saved to {file_path}')
