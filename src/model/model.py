@@ -6,6 +6,8 @@ from src.utils.metric_tracker import MetricTracker
 from src.layers.convolution import Convolution
 from src.layers.dense import Dense
 from src.layers.flatten import Flatten
+from src.layers.pooling import Pooling
+
 from src.activations.relu import ReLU
 from src.activations.softmax import Softmax
 from src.activations.sigmoid import Sigmoid
@@ -30,6 +32,7 @@ class Model:
         # To be set during training with ImageDataGenerator
         self.index_to_class = None
         self.class_indices = None
+        self.image_dimensions = ()
 
     def print_information(self):
         """
@@ -46,6 +49,13 @@ class Model:
             # Print the class name of each layer
             print(layer.__class__.__name__)
 
+    def get_input_dimensions(self):
+        """
+
+        :return: The expected dimensions of the input image
+        """
+        return self.image_dimensions
+
     def predict(self, x):
         """
         Perform a forward pass through the model to make a prediction and return both
@@ -58,14 +68,22 @@ class Model:
 
         NOTE: This method currently only supports predictions for one image, as opposed to batches of images.
         """
+
+        # Remove depth from x.shape
+        input_shape = x.shape[1:]
+
+        # Check if the input image dimensions match the model's expected dimensions
+        if input_shape != self.image_dimensions:
+            raise ValueError(f"Input image dimensions {input_shape} do not match the model's expected dimensions {self.image_dimensions}")
+
         # Forward pass to get raw predictions
         confidence_batch = self.forward(x)
 
         confidence_arr = confidence_batch[0]
 
         if len(confidence_arr) == 1:
-            confidence_score = confidence_arr
-            predicted_index = int(round(confidence_arr))
+            confidence_score = confidence_arr[0]
+            predicted_index = int(np.round(confidence_arr))
         else:
             predicted_index = np.argmax(confidence_arr, axis=-1)
             confidence_score = confidence_arr[predicted_index]
@@ -120,6 +138,15 @@ class Model:
         :param learning_rate: float
             Learning rate for updating the layers' parameters.
         """
+        self.image_dimensions = data_gen.target_size
+
+        # Adjust image dimensions based on image mode
+        if data_gen.image_mode == 'RGB':
+            # Add a dimension of 3 at the start for RGB images
+            self.image_dimensions = (3,) + self.image_dimensions
+        elif data_gen.image_mode == 'L':
+            # Add a dimension of 1 at the start for grayscale images
+            self.image_dimensions = (1,) + self.image_dimensions
 
         self.index_to_class = data_gen.index_to_class
         self.class_indices = data_gen.class_indices
@@ -238,6 +265,10 @@ class Model:
             architecture_group.attrs['loss_function'] = self.loss_function.__name__
             architecture_group.attrs['loss_function_prime'] = self.loss_function_prime.__name__
 
+            # Save image dimensions if available
+            if self.image_dimensions is not None:
+                architecture_group.attrs['image_dimensions'] = self.image_dimensions
+
             # Convert dictionaries to lists of tuples and save as attributes
             if self.class_indices is not None:
                 # Keys as strings (class names)
@@ -260,35 +291,38 @@ class Model:
                 # Set an attribute for the layer group
                 layer_group.attrs['class_name'] = layer.__class__.__name__
 
-                # Save parameters specific to Flatten layer
-                if isinstance(layer, Flatten):
-                    # Save input and output shapes as attributes for Flatten layer
-                    layer_group.attrs['input_shape'] = layer.input_shape
-                    layer_group.attrs['output_shape'] = layer.output_shape
-
                 # Save parameters for Dense layer
-                elif isinstance(layer, Dense):
+                if isinstance(layer, Dense):
                     # Save input and output sizes for Dense layer
-                    layer_group.attrs['input_size'] = layer.input_size
                     layer_group.attrs['output_size'] = layer.output_size
 
-                    # Save weights and biases
+                    # Save weights and bias
                     layer_group.create_dataset('weights', data=layer.weights)
-                    layer_group.create_dataset('biases', data=layer.bias)
+                    layer_group.create_dataset('bias', data=layer.bias)
+
 
                 # Save parameters for Convolution layer
                 elif isinstance(layer, Convolution):
 
-                    # Save input shape
-                    layer_group.attrs['input_shape_conv'] = layer.input_shape
+                    if layer.input_shape is not None:
+                        layer_group.attrs['input_shape'] = layer.input_shape
+                    if layer.output_shape is not None:
+                        layer_group.attrs['output_shape'] = layer.output_shape
 
                     # Save kernel size (assumed to be square) and depth
                     layer_group.attrs['kernel_size'] = layer.kernels.shape[2]
                     layer_group.attrs['depth'] = layer.depth
 
-                    # Save kernels and biases as datasets for convolutional layers
+                    # Save kernels and bias as datasets for convolutional layers
                     layer_group.create_dataset('kernels', data=layer.kernels)
-                    layer_group.create_dataset('biases', data=layer.biases)
+                    layer_group.create_dataset('bias', data=layer.bias)
+
+                # Save parameters for Pooling layer
+                elif isinstance(layer, Pooling):
+                    # Save pooling parameters
+                    layer_group.attrs['pool_size'] = layer.pool_size
+                    layer_group.attrs['stride'] = layer.stride
+                    layer_group.attrs['mode'] = layer.mode
 
                 # Check for specific activation layers
                 if isinstance(layer, (ReLU, Sigmoid, Softmax, Tanh)):
