@@ -4,6 +4,7 @@ import os
 from src.layers.dense import Dense
 from src.layers.convolution import Convolution
 from src.layers.flatten import Flatten
+from src.layers.pooling import Pooling
 from src.activations.relu import ReLU
 from src.activations.sigmoid import Sigmoid
 from src.activations.softmax import Softmax
@@ -38,6 +39,9 @@ def load_model(name):
         with h5py.File(file_path, 'r') as f:
             # Load the architecture information
             architecture_group = f['architecture']
+
+            if 'image_dimensions' in architecture_group.attrs:
+                model.image_dimensions = tuple(architecture_group.attrs['image_dimensions'])
 
             # Load class mappings from datasets
             if 'class_indices_keys' in f and 'class_indices_values' in f:
@@ -112,24 +116,32 @@ def reconstruct_layer(layer_group):
 
     # Reconstruct each layer based on its class name
     if class_name == 'Flatten':
-        input_shape = tuple(layer_group.attrs['input_shape'])
-        output_shape = tuple(layer_group.attrs['output_shape'])
-        layer = Flatten(input_shape, output_shape)
+        layer = Flatten()
 
     elif class_name == 'Dense':
-        input_size = layer_group.attrs['input_size']
         output_size = layer_group.attrs['output_size']
-        layer = Dense(input_size, output_size)
+        layer = Dense(output_size)
         layer.weights = layer_group['weights'][:]
-        layer.biases = layer_group['biases'][:]
+        layer.bias = layer_group['bias'][:]
 
     elif class_name == 'Convolution':
-        input_shape_con = tuple(layer_group.attrs['input_shape_conv'])
         kernel_size = layer_group.attrs['kernel_size']
         depth = layer_group.attrs['depth']
-        layer = Convolution(input_shape_con, kernel_size, depth)
+
+        layer = Convolution(kernel_size, depth)
+        if 'input_shape' in layer_group.attrs:
+            layer.input_shape = tuple(layer_group.attrs['input_shape'])
+        if 'output_shape' in layer_group.attrs:
+            layer.output_shape = tuple(layer_group.attrs['output_shape'])
         layer.kernels = layer_group['kernels'][:]
-        layer.biases = layer_group['biases'][:]
+        layer.bias = layer_group['bias'][:]
+
+    elif class_name == 'Pooling':
+        # Load Pooling layer attributes
+        pool_size = tuple(layer_group.attrs['pool_size'])
+        stride = layer_group.attrs['stride']
+        mode = layer_group.attrs['mode']
+        layer = Pooling(pool_size=pool_size, stride=stride, mode=mode)
 
     elif class_name == 'ReLU':
         layer = ReLU()
