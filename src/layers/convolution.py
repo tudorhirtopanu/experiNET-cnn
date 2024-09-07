@@ -4,13 +4,10 @@ from src.layers.layer import Layer
 
 
 class Convolution(Layer):
-    def __init__(self, input_shape, kernel_size, depth):
+    def __init__(self, kernel_size, depth):
         """
         Initialize the convolutional layer.
 
-        :param input_shape: tuple of (depth, height, width)
-            The shape of the input data where depth is the number of input channels,
-            height is the height of the input, and width is the width of the input.
         :param kernel_size: int
             The size (height and width) of the convolutional kernels. Assumes square kernels.
         :param depth: int
@@ -18,20 +15,40 @@ class Convolution(Layer):
         """
 
         super().__init__()
-        input_depth, input_height, input_width = input_shape
+
+        self.kernel_size = kernel_size
         self.depth = depth
-        self.input_shape = input_shape
-        self.input_depth = input_depth
-        self.output_shape = (depth, input_height - kernel_size+1, input_width - kernel_size+1)
+        self.kernels_shape = None
+        self.output_shape = None
+        self.bias = None
+        self.kernels = None
+        self.input_shape = None
 
-        # Number of kernels, depth of each kernel, size of matrices in each kernel
-        self.kernels_shape = (depth, self.input_depth, kernel_size, kernel_size)
+    def initialize_weights(self, input_depth, input_height, input_width):
+        """
+        Initialize the kernels and bias for the convolutional layer.
 
-        # Improved weight initialization using He initialization (recommended for ReLU)
-        self.kernels = np.random.randn(*self.kernels_shape) * np.sqrt(2 / (self.input_depth * kernel_size * kernel_size))
+        This method sets up the necessary weights and biases for the convolutional layer
+        based on the input dimensions. The weight initialization follows He initialization.
 
-        # Initialize biases to zero
-        self.biases = np.zeros(depth)
+        :param input_depth: int
+            The number of input channels/depth of the input data.
+        :param input_height: int
+            The height of the input data.
+        :param input_width: int
+            The width of the input data.
+
+        This method performs the following tasks:
+        - Sets the `input_shape` attribute using the provided input dimensions.
+        - Calculates the `output_shape` based on the depth of the filters, the kernel size, and the input dimensions.
+        - Initializes the `kernels` (weights) using a random normal distribution scaled according to the He initialization method.
+        - Initializes the `bias` as a zero vector with the length equal to the number of filters (`depth`).
+        """
+        self.input_shape = (input_depth, input_height, input_width)
+        self.output_shape = (self.depth, input_height - self.kernel_size + 1, input_width - self.kernel_size + 1)
+        self.kernels_shape = (self.depth, input_depth, self.kernel_size, self.kernel_size)
+        self.kernels = np.random.randn(*self.kernels_shape) * np.sqrt(2 / (input_depth * self.kernel_size * self.kernel_size))
+        self.bias = np.zeros(self.depth)
 
     def forward(self, input_array):
         """
@@ -42,6 +59,12 @@ class Convolution(Layer):
         :return: numpy array
             A 4D array of shape (batch_size, depth, output_height, output_width) representing the output of the convolutional layer.
         """
+
+        if self.kernels is None or self.bias is None:
+            # Initialize weights if they haven't been initialized (happens during training)
+            input_depth, input_height, input_width = input_array.shape[1:]
+            self.initialize_weights(input_depth, input_height, input_width)
+
         self.input = input_array  # Store the input for use in backpropagation
         batch_size = input_array.shape[0]
 
@@ -53,24 +76,24 @@ class Convolution(Layer):
             # Iterate over each output channel
             for i in range(self.depth):
                 # Iterate over each input channel
-                for j in range(self.input_depth):
+                for j in range(self.input_shape[0]):
                     # Perform 2D correlation between the input and the current kernel
                     self.output[b, i] += correlate2D(self.input[b, j], self.kernels[i, j])
 
                 # Add the bias for the current filter across the entire feature map
-                self.output[b, i] += self.biases[i]
+                self.output[b, i] += self.bias[i]
 
         return self.output
 
     def backward(self, output_gradient, learning_rate):
         """
-        Compute gradients for backpropagation and update the kernels and biases.
+        Compute gradients for backpropagation and update the kernels and bias.
 
         :param output_gradient: numpy array
             The gradient of the loss with respect to the output of this layer, of shape
             (batch_size, depth, output_height, output_width).
         :param learning_rate: float
-            The learning rate used to scale the updates for kernels and biases.
+            The learning rate used to scale the updates for kernels and bias.
         :return: numpy array
             The gradient of the loss with respect to the input of this layer, of shape
             (batch_size, input_depth, input_height, input_width).
@@ -84,7 +107,7 @@ class Convolution(Layer):
         # Iterate over each item in the batch
         for b in range(batch_size):
             for i in range(self.depth):  # Iterate over each output channel
-                for j in range(self.input_depth):  # Iterate over each input channel
+                for j in range(self.input_shape[0]):  # Iterate over each input channel
                     # Compute the gradient with respect to the kernel
                     kernels_gradient[i, j] += correlate2D(self.input[b, j], output_gradient[b, i])
 
@@ -94,9 +117,9 @@ class Convolution(Layer):
         # Update the kernels using the computed gradients
         self.kernels -= learning_rate * kernels_gradient / batch_size
 
-        # Update the biases using the output gradient: sum over height and width, then average over batch
+        # Update the bias using the output gradient: sum over height and width, then average over batch
         bias_gradient = np.mean(output_gradient, axis=(0, 2, 3))  # Shape (3,)
-        self.biases -= learning_rate * bias_gradient
+        self.bias -= learning_rate * bias_gradient
 
         # Return the gradient with respect to the input
         return input_gradient

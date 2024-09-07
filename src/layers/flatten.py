@@ -3,20 +3,12 @@ from src.layers.layer import Layer
 
 
 class Flatten(Layer):
-    def __init__(self, input_shape, output_shape):
+    def __init__(self):
         """
         Initialize a Flatten layer.
-
-        :param input_shape: tuple
-            The shape of the input data that this layer will reshape.
-            This should match the shape of the data that is passed to this layer during the forward pass.
-        :param output_shape: tuple
-            The desired shape to which the input data will be reshaped.
-            The total number of elements must be the same as in the input_shape.
         """
         super().__init__()
-        self.input_shape = input_shape
-        self.output_shape = output_shape
+        self.input_shape = None
 
     def forward(self, input_data):
         """
@@ -28,10 +20,12 @@ class Flatten(Layer):
             The reshaped output data with shape self.output_shape.
         """
         self.input = input_data
+        self.input_shape = input_data.shape[1:]
         batch_size = input_data.shape[0]
 
+        flattened_size = np.prod(self.input_shape)
         # Flatten to (batch_size, flattened_size)
-        reshaped_data = np.reshape(input_data, (batch_size, *self.output_shape))
+        reshaped_data = np.reshape(input_data, (batch_size, flattened_size))
         return reshaped_data
 
     def backward(self, output_gradient, learning_rate):
