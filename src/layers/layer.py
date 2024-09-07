@@ -1,4 +1,7 @@
-class Layer:
+from abc import ABC, abstractmethod
+
+
+class Layer(ABC):
     def __init__(self):
         """
         Initialize a base Layer object.
@@ -10,13 +13,14 @@ class Layer:
         self.input = None
         self.output = None
 
-    def forward(self, input):
+    @abstractmethod
+    def forward(self, input_data):
         """
         Perform the forward pass through the layer.
 
         This method should be overridden by subclasses to implement specific layer functionality.
 
-        :param input: numpy array
+        :param input_data: numpy array
             The input data to the layer.
         :return: numpy array
             The output data produced by the layer after applying the layer-specific transformation.
@@ -27,6 +31,7 @@ class Layer:
         """
         pass
 
+    @abstractmethod
     def backward(self, output_gradient, learning_rate):
         """
         Perform the backward pass to compute gradients and update parameters.
