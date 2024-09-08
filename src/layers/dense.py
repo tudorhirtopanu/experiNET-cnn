@@ -1,9 +1,10 @@
-from src.layers.layer import Layer
 import numpy as np
+from src.utils.activation_utils import get_activation_function
+from src.layers.layer import Layer
 
 
 class Dense(Layer):
-    def __init__(self, output_size):
+    def __init__(self, output_size, activation=None):
         """
         Initializes a fully connected (dense) layer.
 
@@ -21,6 +22,10 @@ class Dense(Layer):
         # Weights and bias will be initialized in the first forward pass
         self.weights = None
         self.bias = None
+
+        # Get the activation function
+        self.activation_name = activation
+        self.activation = get_activation_function(activation)
 
     def initialize_weights(self, input_size):
         """
@@ -50,9 +55,9 @@ class Dense(Layer):
         self.input = input_data
 
         # Perform matrix multiplication and add bias
-        output = np.dot(self.input, self.weights.T) + self.bias
-
-        return output
+        self.output = np.dot(self.input, self.weights.T) + self.bias
+        self.output = self.activation.forward(self.output)
+        return self.output
 
     def backward(self, output_gradient, learning_rate):
         """
@@ -68,12 +73,14 @@ class Dense(Layer):
         """
         batch_size = self.input.shape[0]
 
+        gradient = self.activation.backward(output_gradient, learning_rate)
+
         # Compute gradients for weights and input
-        weights_gradient = np.dot(output_gradient.T, self.input) / batch_size
-        input_gradient = np.dot(output_gradient, self.weights)
+        weights_gradient = np.dot(gradient.T, self.input) / batch_size
+        input_gradient = np.dot(gradient, self.weights)
 
         # Update weights and bias
         self.weights -= learning_rate * weights_gradient
-        self.bias -= learning_rate * np.sum(output_gradient, axis=0) / batch_size
+        self.bias -= learning_rate * np.sum(gradient, axis=0) / batch_size
 
         return input_gradient

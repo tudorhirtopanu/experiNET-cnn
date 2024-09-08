@@ -1,10 +1,11 @@
 import numpy as np
 from src.utils.convolution_utils import correlate2D, convolve2D
+from src.utils.activation_utils import get_activation_function
 from src.layers.layer import Layer
 
 
 class Convolution(Layer):
-    def __init__(self, kernel_size, depth):
+    def __init__(self, kernel_size, depth, activation=None):
         """
         Initialize the convolutional layer.
 
@@ -23,6 +24,9 @@ class Convolution(Layer):
         self.bias = None
         self.kernels = None
         self.input_shape = None
+
+        self.activation_name = activation
+        self.activation = get_activation_function(activation)
 
     def initialize_weights(self, input_depth, input_height, input_width):
         """
@@ -83,6 +87,8 @@ class Convolution(Layer):
                 # Add the bias for the current filter across the entire feature map
                 self.output[b, i] += self.bias[i]
 
+        self.output = self.activation.forward(self.output)
+
         return self.output
 
     def backward(self, output_gradient, learning_rate):
@@ -99,6 +105,8 @@ class Convolution(Layer):
             (batch_size, input_depth, input_height, input_width).
         """
         batch_size = output_gradient.shape[0]
+
+        output_gradient = self.activation.backward(self.output, learning_rate) * output_gradient
 
         # Initialize gradients for kernels and inputs
         kernels_gradient = np.zeros(self.kernels_shape)

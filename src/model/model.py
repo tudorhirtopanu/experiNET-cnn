@@ -300,6 +300,9 @@ class Model:
                     layer_group.create_dataset('weights', data=layer.weights)
                     layer_group.create_dataset('bias', data=layer.bias)
 
+                    # Save the activation name
+                    layer_group.attrs['activation_name'] = layer.activation_name
+
 
                 # Save parameters for Convolution layer
                 elif isinstance(layer, Convolution):
@@ -317,6 +320,9 @@ class Model:
                     layer_group.create_dataset('kernels', data=layer.kernels)
                     layer_group.create_dataset('bias', data=layer.bias)
 
+                    # Save the activation name
+                    layer_group.attrs['activation_name'] = layer.activation_name
+
                 # Save parameters for Pooling layer
                 elif isinstance(layer, Pooling):
                     # Save pooling parameters
@@ -324,9 +330,9 @@ class Model:
                     layer_group.attrs['stride'] = layer.stride
                     layer_group.attrs['mode'] = layer.mode
 
-                # Check for specific activation layers
-                if isinstance(layer, (ReLU, Sigmoid, Softmax, Tanh)):
-                    layer_group.attrs['activation_function'] = layer.activation.__name__
-                    layer_group.attrs['activation_function_prime'] = layer.activation_prime.__name__
+                # Check for specific activation_name layers
+                #if isinstance(layer, (ReLU, Sigmoid, Softmax, Tanh)):
+                    #layer_group.attrs['activation_function'] = layer.activation.__name__
+                    #layer_group.attrs['activation_function_prime'] = layer.activation_prime.__name__
 
             print(f'Model saved to {file_path}')

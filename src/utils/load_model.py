@@ -120,15 +120,17 @@ def reconstruct_layer(layer_group):
 
     elif class_name == 'Dense':
         output_size = layer_group.attrs['output_size']
-        layer = Dense(output_size)
+        activation = layer_group.attrs['activation_name']
+        layer = Dense(output_size, activation=activation)
         layer.weights = layer_group['weights'][:]
         layer.bias = layer_group['bias'][:]
 
     elif class_name == 'Convolution':
         kernel_size = layer_group.attrs['kernel_size']
         depth = layer_group.attrs['depth']
+        activation = layer_group.attrs['activation_name']
 
-        layer = Convolution(kernel_size, depth)
+        layer = Convolution(kernel_size, depth, activation=activation)
         if 'input_shape' in layer_group.attrs:
             layer.input_shape = tuple(layer_group.attrs['input_shape'])
         if 'output_shape' in layer_group.attrs:
@@ -142,15 +144,6 @@ def reconstruct_layer(layer_group):
         stride = layer_group.attrs['stride']
         mode = layer_group.attrs['mode']
         layer = Pooling(pool_size=pool_size, stride=stride, mode=mode)
-
-    elif class_name == 'ReLU':
-        layer = ReLU()
-    elif class_name == 'Sigmoid':
-        layer = Sigmoid()
-    elif class_name == 'Softmax':
-        layer = Softmax()
-    elif class_name == 'Tanh':
-        layer = Tanh()
     else:
         raise ValueError(f"Unsupported layer type: {class_name}")
 
