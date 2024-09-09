@@ -67,6 +67,8 @@ class ImageDataGenerator:
             self.val_image_paths, self.val_labels = self._collect_image_paths_and_labels(self.val_directory)
             self.num_val_images = len(self.val_image_paths)
 
+            self._compare_class_directories(self.train_directory, self.val_directory)
+
         else:
             self.val_image_paths, self.val_labels = None, None
             self.num_val_images = 0
@@ -172,6 +174,27 @@ class ImageDataGenerator:
         image = np.transpose(image, (2, 0, 1))
 
         return image
+
+    def _compare_class_directories(self, train_directory, val_directory):
+        """
+        Compare the class subdirectories between the train and validation directories to ensure they match.
+
+        :param train_directory: string
+            Path to the train dataset directory.
+        :param val_directory: string
+            Path to the validation dataset directory.
+
+        :raises ValueError: If the class directories in train and validation directories do not match.
+        """
+
+        # Get subdirectories (class names) from both directories
+        train_classes = set([d for d in os.listdir(train_directory) if os.path.isdir(os.path.join(train_directory, d))])
+        val_classes = set([d for d in os.listdir(val_directory) if os.path.isdir(os.path.join(val_directory, d))])
+
+        # Check if the class directories are the same
+        if train_classes != val_classes:
+            raise ValueError(f"Mismatch between class directories in train and val. "
+                             f"Train classes: {train_classes}, Val classes: {val_classes}")
 
     def __iter__(self, mode='train'):
         """
