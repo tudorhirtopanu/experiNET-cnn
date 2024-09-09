@@ -2,6 +2,7 @@
 from src.layers.convolution import Convolution
 from src.layers.dense import Dense
 from src.layers.flatten import Flatten
+from src.layers.pooling import Pooling
 
 # Activation Functions
 from activations.softmax import Softmax
@@ -39,20 +40,20 @@ data_gen = ImageDataGenerator(
 )
 
 # Create a model with a loss function and its prime
-model = Model(binary_cross_entropy, binary_cross_entropy_prime)
+model = Model(categorical_cross_entropy, categorical_cross_entropy_prime)
 
 # Add layers to the model
-model.add(Convolution((1, 28, 28), 3, 3))
-model.add(ReLU())
-model.add(Flatten((3, 26, 26), (3 * 26 * 26,)))
-model.add(Dense(3 * 26 * 26, 100))
-model.add(ReLU())
-model.add(Dense(100, 1))
-model.add(Sigmoid())
+model.add(Convolution(3, 3, activation='relu'))
+model.add(Pooling())
+model.add(Flatten())
+model.add(Dense(200, activation='relu'))
+model.add(Dense(100, activation='relu'))
+model.add(Dense(10, activation='softmax'))
+
 
 # Train the model
-EPOCHS = 30
-LEARNING_RATE = 0.01
+EPOCHS = 50
+LEARNING_RATE = 0.1
 model.train(data_gen, EPOCHS, LEARNING_RATE)
 
 # Save the model
