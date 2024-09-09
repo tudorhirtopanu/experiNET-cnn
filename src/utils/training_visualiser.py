@@ -29,10 +29,10 @@ class TrainingVisualiser:
 
         # Plot epoch errors
         epochs = range(1, len(self.train_epoch_errors) + 1)
-        plt.plot(epochs, self.train_epoch_errors, label='Epoch Error', linewidth=2, color='orange')
+        plt.plot(epochs, self.train_epoch_errors, label='Training Error', linewidth=2, color='orange')
 
         # Plot validation epoch errors if available
-        if len(self.val_epoch_errors)>0:
+        if len(self.val_epoch_errors) > 0:
             plt.plot(epochs, self.val_epoch_errors, label='Validation Error', linewidth=2, color='blue')
 
         plt.xlabel('Epoch')

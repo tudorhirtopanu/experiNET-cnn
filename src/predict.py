@@ -1,5 +1,5 @@
 from src.utils.load_model import load_model
-from src.utils.test_utils import preprocess_and_normalize, load_image
+from src.utils.predict_utils import preprocess_and_normalize, load_image
 
 image_path = "path/to/image.jpg"
 

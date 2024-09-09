@@ -1,5 +1,5 @@
 import numpy as np
-from activation import Activation
+from src.activations.activation import Activation
 
 
 class Sigmoid(Activation):
