@@ -10,6 +10,7 @@ A convolutional neural network library built from scratch using only **numpy**, 
   - [Training the Model](#training-the-model)
   - [Predicting with the Model](#predicting-with-the-model)
 - [Future Features](#future-features)
+- [License](#license)
 
 ## Features
 
@@ -105,4 +106,9 @@ To use the model for prediction on a new image, follow these steps:
 - Include more activation functions (e.g., Leaky ReLU, ELU).
 - Add more metrics for performance evaluation and enable saving graphs
 - Provide an in depth model evaluation
+
+## License
+
+This project is licensed under the [MIT License](./LICENSE). You are free to use, modify, and distribute this software as long as you include the original license. See the `LICENSE` file for more details.
+
 
